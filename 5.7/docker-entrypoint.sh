@@ -21,11 +21,24 @@ _datadir() {
 	"$@" --verbose --help 2>/dev/null | awk '$1 == "datadir" { print $2; exit }'
 }
 
+# check if datadir is a mounted NFS
+_isnfs() {
+	local tmp="$(_datadir "$@")"
+	local useNFS=$(mount|awk -v datadir="${tmp%/}" '$3 == datadir {print $5}')
+	if [ -n $useNFS -a $useNFS = 'nfs' ]; then
+    echo true
+  else
+    echo false
+  fi
+}
+
 # allow the container to be started with `--user`
 if [ "$1" = 'mysqld' -a -z "$wantHelp" -a "$(id -u)" = '0' ]; then
 	DATADIR="$(_datadir "$@")"
 	mkdir -p "$DATADIR"
-	chown -R mysql:mysql "$DATADIR"
+	if [ ! $(_isnfs "$@") ]; then
+		chown -R mysql:mysql "$DATADIR"
+	fi
 	exec gosu mysql "$BASH_SOURCE" "$@"
 fi
 
